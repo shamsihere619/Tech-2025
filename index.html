@@ -23,10 +23,10 @@
     header h1 { margin:0; font-size:28px; }
     header p { margin:5px 0 0; font-size:16px; }
     .card { background:white; padding:20px; margin:20px auto; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.15); max-width:650px; }
-    .card img { border-radius:10px; margin-bottom:15px; }
-    .btn { background:#0077cc; color:white; padding:14px 28px; text-decoration:none; border-radius:10px; font-weight:bold; display:inline-block; margin-top:10px; transition:0.3s; }
+    .card img { border-radius:10px; margin-bottom:15px; width:100%; height:auto; }
+    .btn { background:#0077cc; color:white; padding:14px 28px; text-decoration:none; border-radius:10px; font-weight:bold; display:inline-block; margin-top:10px; transition:0.3s; cursor:pointer; }
     .btn:hover { background:#005fa3; }
-    .btn.cta { position:sticky; bottom:20px; z-index:999; }
+    .btn.cta { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:999; max-width:300px; width:calc(100% - 40px); }
     footer { margin-top:40px; padding:15px; background:#eee; text-align:center; font-size:14px; }
     footer a { color:#0077cc; text-decoration:none; margin:0 5px; }
     footer a:hover { text-decoration:underline; }
@@ -41,8 +41,8 @@
 
 <div class="card">
   <h2>Smartest Picks of the Year</h2>
-  <img src="https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=80" alt="AI Tech" width="100%">
-  <p>Discover AI-based tools, productivity boosters and trending apps.</p>
+  <img loading="lazy" src="https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=80" alt="AI productivity tools on a digital screen">
+  <p>Discover AI-based tools, productivity boosters, and trending apps.</p>
   <a href="#" onclick="getLink()" class="btn cta">Try Tools Now</a>
 </div>
 
@@ -83,50 +83,64 @@
   }, 4000);
 </script>
 
-<!-- Bot Filter + GA tracking -->
+<!-- Bot Filter + GA tracking with faster CTA activation -->
 <script>
 (function(){
-  const DELAY_MS = 2000, MIN_ACTIVITY = 1;
+  const MIN_ACTIVITY = 1;
   const ctas = Array.from(document.querySelectorAll('.btn, .cta'));
   if (!ctas.length) return;
 
-  let isBot=false, activityCount=0;
+  let isBot = false, activityCount = 0;
   try {
     if(navigator.webdriver) isBot=true;
     const ua=navigator.userAgent||'';
     if(/(HeadlessChrome|PhantomJS|puppeteer|bot|crawler|spider|curl|wget)/i.test(ua)) isBot=true;
   } catch(e){}
 
-  const markActive=()=>{activityCount=Math.min(999,activityCount+1);};
-  ['mousemove','scroll','touchstart','keydown'].forEach(ev=>window.addEventListener(ev,markActive,{passive:true}));
+  const markActive = () => {
+    activityCount = Math.min(999, activityCount + 1);
+    if(!isBot && activityCount >= MIN_ACTIVITY){
+      ctas.forEach(btn => {
+        if(btn.dataset._disabled==='1'){
+          delete btn.dataset._disabled;
+          btn.removeAttribute('aria-disabled');
+          btn.style.pointerEvents='';
+          btn.style.opacity='';
+        }
+      });
+    }
+  };
+
+  ['mousemove','scroll','touchstart','keydown'].forEach(ev => window.addEventListener(ev, markActive, {passive:true}));
 
   ctas.forEach(btn=>{
-    btn.dataset._origHref=btn.getAttribute('href')||'#';
+    btn.dataset._origHref = btn.getAttribute('href')||'#';
     btn.setAttribute('href','#');
     btn.dataset._disabled='1';
+    btn.setAttribute('aria-disabled','true');
     btn.style.pointerEvents='none';
     btn.style.opacity='.6';
   });
 
+  // Send GA page_view after 1s
   setTimeout(()=>{
-    const engaged=activityCount>=MIN_ACTIVITY;
+    const engaged = activityCount >= MIN_ACTIVITY;
     if(window.gtag) gtag('event','page_view',{bot_suspected:isBot?1:0, engaged:engaged?1:0});
-    if(!isBot && engaged){
-      ctas.forEach(btn=>{
-        delete btn.dataset._disabled;
-        btn.style.pointerEvents='';
-        btn.style.opacity='';
-      });
-    } else {
-      ctas.forEach(btn=>btn.style.display='none');
+    if(isBot) ctas.forEach(btn=>btn.style.display='none');
+  }, 1000);
+
+  // Fallback auto redirect after 10s
+  setTimeout(()=>{
+    if(!sessionStorage.getItem("clicked") && !isBot){
+      getLink();
     }
-  }, DELAY_MS);
+  }, 10000);
 
   ctas.forEach(btn=>{
     btn.addEventListener('click', function(ev){
       ev.preventDefault();
       if(btn.dataset._disabled==='1') return;
-      const label=btn.textContent.trim().slice(0,60);
+      const label = btn.textContent.trim().slice(0,60);
       if(window.gtag) gtag('event','cta_click',{event_category:'engagement',event_label:label,value:1});
       setTimeout(()=>{ if(typeof window.getLink==='function') getLink(); },120);
     }, {passive:false});
@@ -136,8 +150,5 @@
 
 </body>
 </html>
-
-
-
 
 
